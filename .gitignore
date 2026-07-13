@@ -39,3 +39,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local tooling
+.claude/
+
+# raw font source dumps (only the used weight lives in assets/fonts/)
+/Bricolage_Grotesque/
