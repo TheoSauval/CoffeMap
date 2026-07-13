@@ -73,13 +73,15 @@ export default function CafeDetailScreen() {
           <View style={styles.content}>
             <Text style={styles.name}>{cafe.name}</Text>
 
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={14} color={colors.espresso} />
-              <Text style={styles.ratingText}>{cafe.rating.toFixed(1)}</Text>
-              {cafe.userRatingCount != null && (
-                <Text style={styles.ratingCount}>({cafe.userRatingCount} avis)</Text>
-              )}
-            </View>
+            {cafe.rating > 0 && (
+              <View style={styles.ratingRow}>
+                <Ionicons name="star" size={14} color={colors.espresso} />
+                <Text style={styles.ratingText}>{cafe.rating.toFixed(1)}</Text>
+                {cafe.userRatingCount != null && (
+                  <Text style={styles.ratingCount}>({cafe.userRatingCount} avis)</Text>
+                )}
+              </View>
+            )}
 
             <Text style={styles.address}>{cafe.address}</Text>
 

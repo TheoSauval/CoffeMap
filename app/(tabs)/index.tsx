@@ -156,10 +156,12 @@ export default function MapScreen() {
                 {selectedCafe.address}
               </Text>
             </View>
-            <View style={styles.ratingPill}>
-              <Ionicons name="star" size={12} color={colors.espresso} />
-              <Text style={styles.ratingText}>{selectedCafe.rating.toFixed(1)}</Text>
-            </View>
+            {selectedCafe.rating > 0 && (
+              <View style={styles.ratingPill}>
+                <Ionicons name="star" size={12} color={colors.espresso} />
+                <Text style={styles.ratingText}>{selectedCafe.rating.toFixed(1)}</Text>
+              </View>
+            )}
 
             <Pressable style={styles.directionsButton} onPress={() => openDirections(selectedCafe)}>
               <Ionicons name="navigate" size={18} color={colors.paper} />

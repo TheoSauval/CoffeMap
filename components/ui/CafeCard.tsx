@@ -19,10 +19,12 @@ export function CafeCard({ cafe, distanceLabel }: { cafe: Cafe; distanceLabel?: 
           <Text style={styles.name} numberOfLines={1}>
             {cafe.name}
           </Text>
-          <View style={styles.ratingPill}>
-            <Ionicons name="star" size={12} color={colors.espresso} />
-            <Text style={styles.ratingText}>{cafe.rating.toFixed(1)}</Text>
-          </View>
+          {cafe.rating > 0 && (
+            <View style={styles.ratingPill}>
+              <Ionicons name="star" size={12} color={colors.espresso} />
+              <Text style={styles.ratingText}>{cafe.rating.toFixed(1)}</Text>
+            </View>
+          )}
         </View>
 
         <Text style={styles.tagline} numberOfLines={1}>

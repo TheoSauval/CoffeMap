@@ -18,7 +18,7 @@ const PARIS_REGION: Region = {
   longitudeDelta: 0.04,
 };
 
-export function useNearbyCafes() {
+export function useNearbyCafes(radiusMeters = 1500) {
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [region, setRegion] = useState<Region>(PARIS_REGION);
   const [loading, setLoading] = useState(true);
@@ -40,7 +40,7 @@ export function useNearbyCafes() {
           longitude = position.coords.longitude;
         }
 
-        const nearby = await fetchNearbyCafes(latitude, longitude);
+        const nearby = await fetchNearbyCafes(latitude, longitude, radiusMeters);
         if (cancelled) return;
 
         setCafes(nearby);
@@ -57,7 +57,7 @@ export function useNearbyCafes() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [radiusMeters]);
 
   return { cafes, region, loading, error };
 }
