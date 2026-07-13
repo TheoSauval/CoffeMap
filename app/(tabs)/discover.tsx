@@ -42,7 +42,10 @@ const LOAD_MORE_OFFSETS = [
 export default function DiscoverScreen() {
   const { cafes: initialCafes, region, loading, error } = useNearbyCafes(DISCOVER_RADIUS_METERS);
 
-  const [cafes, setCafes] = useState<Cafe[]>([]);
+  // Chaque "lot" (recherche initiale + un par tap sur "Voir plus") garde sa
+  // propre position dans la liste : on ne retrie jamais l'ensemble, sinon les
+  // cartes déjà affichées sautent de place à chaque chargement.
+  const [batches, setBatches] = useState<Cafe[][]>([]);
   const [loadMoreStep, setLoadMoreStep] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -52,7 +55,7 @@ export default function DiscoverScreen() {
 
   useEffect(() => {
     if (!loading) {
-      setCafes(initialCafes);
+      setBatches([initialCafes]);
       setLoadMoreStep(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,7 +65,7 @@ export default function DiscoverScreen() {
     setRefreshing(true);
     try {
       const results = await fetchNearbyCafes(region.latitude, region.longitude, DISCOVER_RADIUS_METERS);
-      setCafes(results);
+      setBatches([results]);
       setLoadMoreStep(0);
     } catch {
       // le prochain onglet Carte remontera l'erreur si la clé/API est en cause
@@ -83,10 +86,10 @@ export default function DiscoverScreen() {
         center.longitude,
         LOAD_MORE_SEARCH_RADIUS_METERS
       );
-      setCafes((current) => {
-        const existingIds = new Set(current.map((cafe) => cafe.id));
+      setBatches((current) => {
+        const existingIds = new Set(current.flat().map((cafe) => cafe.id));
         const newOnes = results.filter((cafe) => !existingIds.has(cafe.id));
-        return [...current, ...newOnes];
+        return newOnes.length > 0 ? [...current, newOnes] : current;
       });
       setLoadMoreStep((step) => step + 1);
     } catch {
@@ -98,33 +101,34 @@ export default function DiscoverScreen() {
 
   const availableTags = useMemo(() => {
     const set = new Set<string>();
-    cafes.forEach((cafe) => cafe.tags.forEach((tag) => set.add(tag)));
+    batches.flat().forEach((cafe) => cafe.tags.forEach((tag) => set.add(tag)));
     return Array.from(set);
-  }, [cafes]);
+  }, [batches]);
 
   const visibleCafes = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    const withDistance = cafes
-      .filter((cafe) => !activeTag || cafe.tags.includes(activeTag))
-      .filter((cafe) => {
-        if (!normalizedQuery) return true;
-        return (
-          cafe.name.toLowerCase().includes(normalizedQuery) ||
-          cafe.address.toLowerCase().includes(normalizedQuery)
-        );
-      })
-      .map((cafe) => ({
-        cafe,
-        distance: distanceMeters(region, { latitude: cafe.latitude, longitude: cafe.longitude }),
-      }));
+    const matchesFilters = (cafe: Cafe) => {
+      if (activeTag && !cafe.tags.includes(activeTag)) return false;
+      if (!normalizedQuery) return true;
+      return (
+        cafe.name.toLowerCase().includes(normalizedQuery) ||
+        cafe.address.toLowerCase().includes(normalizedQuery)
+      );
+    };
 
-    withDistance.sort((a, b) =>
-      sortMode === 'rating' ? b.cafe.rating - a.cafe.rating : a.distance - b.distance
+    const withDistance = (cafe: Cafe) => ({
+      cafe,
+      distance: distanceMeters(region, { latitude: cafe.latitude, longitude: cafe.longitude }),
+    });
+
+    return batches.flatMap((batch) =>
+      batch
+        .filter(matchesFilters)
+        .map(withDistance)
+        .sort((a, b) => (sortMode === 'rating' ? b.cafe.rating - a.cafe.rating : a.distance - b.distance))
     );
-
-    return withDistance;
-  }, [cafes, query, activeTag, sortMode, region]);
+  }, [batches, query, activeTag, sortMode, region]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
