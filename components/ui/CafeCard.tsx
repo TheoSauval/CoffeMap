@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, fonts, radius, shadow, spacing } from '@/constants/theme';
-import type { Cafe } from '@/constants/mockCafes';
+import type { Cafe } from '@/types/cafe';
 
 export function CafeCard({ cafe }: { cafe: Cafe }) {
   return (

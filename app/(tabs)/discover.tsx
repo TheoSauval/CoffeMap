@@ -1,16 +1,18 @@
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, fonts, spacing } from '@/constants/theme';
-import { mockCafes } from '@/constants/mockCafes';
+import { useNearbyCafes } from '@/hooks/useNearbyCafes';
 import { CafeCard } from '@/components/ui/CafeCard';
 import { Logo } from '@/components/ui/Logo';
 
 export default function DiscoverScreen() {
+  const { cafes, loading, error } = useNearbyCafes();
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <FlatList
-        data={mockCafes}
+        data={cafes}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
@@ -19,6 +21,15 @@ export default function DiscoverScreen() {
             <Text style={styles.title}>Découvrir</Text>
             <Text style={styles.subtitle}>Les cafés les mieux notés autour de toi</Text>
           </View>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator color={colors.espresso} style={styles.stateSpacing} />
+          ) : (
+            <Text style={styles.stateText}>
+              {error ?? 'Aucun café trouvé autour de toi pour le moment.'}
+            </Text>
+          )
         }
         renderItem={({ item }) => <CafeCard cafe={item} />}
       />
@@ -48,5 +59,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.inkSoft,
     marginTop: 4,
+  },
+  stateSpacing: {
+    marginTop: spacing.xl,
+  },
+  stateText: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.inkSoft,
+    textAlign: 'center',
+    marginTop: spacing.xl,
   },
 });
