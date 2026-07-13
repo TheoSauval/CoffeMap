@@ -14,3 +14,8 @@ export function distanceMeters(a: LatLng, b: LatLng): number {
 
   return 2 * EARTH_RADIUS_METERS * Math.asin(Math.sqrt(h));
 }
+
+export function formatDistance(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters / 10) * 10} m`;
+  return `${(meters / 1000).toFixed(1)} km`;
+}

@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { colors, fonts, radius, shadow, spacing } from '@/constants/theme';
 import type { Cafe } from '@/types/cafe';
 
-export function CafeCard({ cafe }: { cafe: Cafe }) {
+export function CafeCard({ cafe, distanceLabel }: { cafe: Cafe; distanceLabel?: string }) {
   const router = useRouter();
 
   return (
@@ -28,9 +28,17 @@ export function CafeCard({ cafe }: { cafe: Cafe }) {
         <Text style={styles.tagline} numberOfLines={1}>
           {cafe.tagline}
         </Text>
-        <Text style={styles.address} numberOfLines={1}>
-          {cafe.address}
-        </Text>
+        <View style={styles.addressRow}>
+          <Text style={styles.address} numberOfLines={1}>
+            {cafe.address}
+          </Text>
+          {distanceLabel && (
+            <>
+              <Text style={styles.addressDot}>·</Text>
+              <Text style={styles.distance}>{distanceLabel}</Text>
+            </>
+          )}
+        </View>
 
         <View style={styles.tagsRow}>
           {cafe.tags.map((tag) => (
@@ -98,12 +106,28 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     marginTop: 2,
   },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   address: {
+    flexShrink: 1,
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.inkSoft,
     opacity: 0.8,
-    marginTop: 2,
+  },
+  addressDot: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.inkSoft,
+    marginHorizontal: 4,
+  },
+  distance: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    color: colors.terracotta,
   },
   tagsRow: {
     flexDirection: 'row',
