@@ -1,9 +1,11 @@
 import type { Cafe } from '@/types/cafe';
+import type { CafeDetails } from '@/types/cafeDetails';
 
 const SEARCH_URL = 'https://places.googleapis.com/v1/places:searchNearby';
+const DETAILS_URL = 'https://places.googleapis.com/v1/places';
 const PHOTO_MAX_COUNT = 3;
 const PHOTO_MAX_WIDTH_PX = 400;
-const FIELD_MASK = [
+const SEARCH_FIELD_MASK = [
   'places.id',
   'places.displayName',
   'places.formattedAddress',
@@ -11,6 +13,20 @@ const FIELD_MASK = [
   'places.rating',
   'places.types',
   'places.photos',
+].join(',');
+const DETAILS_FIELD_MASK = [
+  'id',
+  'displayName',
+  'formattedAddress',
+  'location',
+  'rating',
+  'userRatingCount',
+  'types',
+  'photos',
+  'internationalPhoneNumber',
+  'websiteUri',
+  'regularOpeningHours',
+  'priceLevel',
 ].join(',');
 
 const TYPE_LABELS: Record<string, string> = {
@@ -38,6 +54,11 @@ type GooglePlace = {
   rating?: number;
   types?: string[];
   photos?: { name: string }[];
+  userRatingCount?: number;
+  internationalPhoneNumber?: string;
+  websiteUri?: string;
+  regularOpeningHours?: { weekdayDescriptions?: string[] };
+  priceLevel?: string;
 };
 
 function toPhotoUrls(photos: { name: string }[] | undefined, apiKey: string): string[] {
@@ -46,6 +67,20 @@ function toPhotoUrls(photos: { name: string }[] | undefined, apiKey: string): st
     (photo) =>
       `https://places.googleapis.com/v1/${photo.name}/media?maxWidthPx=${PHOTO_MAX_WIDTH_PX}&key=${apiKey}`
   );
+}
+
+function toCafe(place: GooglePlace, apiKey: string): Cafe {
+  return {
+    id: place.id,
+    name: place.displayName?.text ?? 'Café',
+    tagline: toTags(place.types).join(' · ') || 'Café de quartier',
+    address: place.formattedAddress ?? '',
+    rating: place.rating ?? 0,
+    tags: toTags(place.types),
+    latitude: place.location?.latitude ?? 0,
+    longitude: place.location?.longitude ?? 0,
+    photoUrls: toPhotoUrls(place.photos, apiKey),
+  };
 }
 
 export async function fetchNearbyCafes(
@@ -63,7 +98,7 @@ export async function fetchNearbyCafes(
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': FIELD_MASK,
+      'X-Goog-FieldMask': SEARCH_FIELD_MASK,
     },
     body: JSON.stringify({
       includedTypes: ['cafe'],
@@ -86,15 +121,35 @@ export async function fetchNearbyCafes(
 
   return (data.places ?? [])
     .filter((place) => place.location?.latitude != null && place.location?.longitude != null)
-    .map((place) => ({
-      id: place.id,
-      name: place.displayName?.text ?? 'Café',
-      tagline: toTags(place.types).join(' · ') || 'Café de quartier',
-      address: place.formattedAddress ?? '',
-      rating: place.rating ?? 0,
-      tags: toTags(place.types),
-      latitude: place.location!.latitude!,
-      longitude: place.location!.longitude!,
-      photoUrls: toPhotoUrls(place.photos, apiKey),
-    }));
+    .map((place) => toCafe(place, apiKey));
+}
+
+export async function fetchPlaceDetails(placeId: string): Promise<CafeDetails> {
+  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+  if (!apiKey) {
+    throw new Error('EXPO_PUBLIC_GOOGLE_PLACES_API_KEY manquante — vérifie ton fichier .env');
+  }
+
+  const response = await fetch(`${DETAILS_URL}/${placeId}`, {
+    headers: {
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': DETAILS_FIELD_MASK,
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Places API a répondu ${response.status}: ${body}`);
+  }
+
+  const place: GooglePlace = await response.json();
+
+  return {
+    ...toCafe(place, apiKey),
+    userRatingCount: place.userRatingCount ?? null,
+    phone: place.internationalPhoneNumber ?? null,
+    website: place.websiteUri ?? null,
+    openingHours: place.regularOpeningHours?.weekdayDescriptions ?? null,
+    priceLevel: place.priceLevel ?? null,
+  };
 }

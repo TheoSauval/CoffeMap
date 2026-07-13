@@ -1,12 +1,15 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 import { colors, fonts, radius, shadow, spacing } from '@/constants/theme';
 import type { Cafe } from '@/types/cafe';
 
 export function CafeCard({ cafe }: { cafe: Cafe }) {
+  const router = useRouter();
+
   return (
-    <View style={[styles.card, shadow.card]}>
+    <Pressable style={[styles.card, shadow.card]} onPress={() => router.push(`/cafe/${cafe.id}`)}>
       <View style={styles.thumb}>
         <Ionicons name="cafe" size={28} color={colors.paper} />
       </View>
@@ -37,7 +40,7 @@ export function CafeCard({ cafe }: { cafe: Cafe }) {
           ))}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

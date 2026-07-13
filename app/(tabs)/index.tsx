@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Linking,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,17 +12,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, PROVIDER_DEFAULT, type Region as MapRegion } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { useRouter } from 'expo-router';
 
 import { colors, fonts, radius, shadow, spacing } from '@/constants/theme';
 import { useNearbyCafes } from '@/hooks/useNearbyCafes';
 import { fetchNearbyCafes } from '@/lib/places';
 import { distanceMeters } from '@/lib/geo';
+import { openDirections } from '@/lib/directions';
 import type { Cafe } from '@/types/cafe';
 
 const SEARCH_HERE_THRESHOLD_METERS = 800;
 const SEARCH_DEBOUNCE_MS = 600;
 
 export default function MapScreen() {
+  const router = useRouter();
   const mapRef = useRef<MapView>(null);
   const [selectedCafe, setSelectedCafe] = useState<Cafe | null>(null);
   const { cafes: initialCafes, region: initialRegion, loading, error } = useNearbyCafes();
@@ -73,22 +74,6 @@ export default function MapScreen() {
         searchArea(center);
       }
     }, SEARCH_DEBOUNCE_MS);
-  };
-
-  const openDirections = (cafe: Cafe) => {
-    const label = encodeURIComponent(cafe.name);
-    const url =
-      Platform.OS === 'ios'
-        ? `maps://?daddr=${cafe.latitude},${cafe.longitude}&dirflg=d&q=${label}`
-        : Platform.OS === 'android'
-          ? `google.navigation:q=${cafe.latitude},${cafe.longitude}`
-          : `https://www.google.com/maps/dir/?api=1&destination=${cafe.latitude},${cafe.longitude}`;
-
-    Linking.openURL(url).catch(() => {
-      Linking.openURL(
-        `https://www.google.com/maps/dir/?api=1&destination=${cafe.latitude},${cafe.longitude}`
-      );
-    });
   };
 
   const centerOnUser = async () => {
@@ -178,6 +163,13 @@ export default function MapScreen() {
 
             <Pressable style={styles.directionsButton} onPress={() => openDirections(selectedCafe)}>
               <Ionicons name="navigate" size={18} color={colors.paper} />
+            </Pressable>
+
+            <Pressable
+              style={styles.infoButton}
+              onPress={() => router.push(`/cafe/${selectedCafe.id}`)}
+            >
+              <Ionicons name="information-circle-outline" size={22} color={colors.espresso} />
             </Pressable>
           </Pressable>
 
@@ -343,6 +335,14 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: radius.pill,
     backgroundColor: colors.terracotta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    backgroundColor: colors.creamDark,
     alignItems: 'center',
     justifyContent: 'center',
   },

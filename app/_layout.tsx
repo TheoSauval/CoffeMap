@@ -58,6 +58,7 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.cream } }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="cafe/[id]" />
       </Stack>
     </View>
   );
