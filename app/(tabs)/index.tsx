@@ -103,6 +103,7 @@ export default function MapScreen() {
           style={StyleSheet.absoluteFill}
           initialRegion={initialRegion}
           onRegionChangeComplete={handleRegionChangeComplete}
+          onPress={() => setSelectedCafe(null)}
           showsUserLocation
           showsMyLocationButton={false}
         >
@@ -110,7 +111,10 @@ export default function MapScreen() {
             <Marker
               key={cafe.id}
               coordinate={{ latitude: cafe.latitude, longitude: cafe.longitude }}
-              onPress={() => setSelectedCafe(cafe)}
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedCafe(cafe);
+              }}
             >
               <View style={styles.pin}>
                 <Ionicons name="cafe" size={16} color={colors.paper} />
