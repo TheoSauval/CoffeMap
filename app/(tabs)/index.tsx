@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -15,34 +16,106 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 
 import { colors, fonts, radius, shadow, spacing } from '@/constants/theme';
+import { FavoriteButton } from '@/components/ui/FavoriteButton';
+import { useFavorites } from '@/lib/favorites';
 import { useNearbyCafes } from '@/hooks/useNearbyCafes';
 import { fetchNearbyCafes } from '@/lib/places';
-import { distanceMeters } from '@/lib/geo';
+import { distanceMeters, formatDistance, regionToRadiusMeters } from '@/lib/geo';
 import { openDirections } from '@/lib/directions';
 import type { Cafe } from '@/types/cafe';
 
 const SEARCH_HERE_THRESHOLD_METERS = 800;
 const SEARCH_DEBOUNCE_MS = 600;
 
+// Sur iOS, un Marker avec tracksViewChanges actif re-capture son rendu en
+// continu (coûteux avec 20 pins). On ne le laisse actif que le temps que la
+// photo arrive, puis on fige — et on le réactive brièvement quand le badge
+// favori change, sinon le pin figé ne refléterait pas le toggle.
+function CafeMarker({
+  cafe,
+  favorite,
+  onPress,
+}: {
+  cafe: Cafe;
+  favorite: boolean;
+  onPress: NonNullable<ComponentProps<typeof Marker>['onPress']>;
+}) {
+  const photoUrl = cafe.photoUrls[0];
+  const [photoLoaded, setPhotoLoaded] = useState(false);
+  const [favoriteFlash, setFavoriteFlash] = useState(false);
+  const firstRender = useRef(true);
+
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    setFavoriteFlash(true);
+    const timer = setTimeout(() => setFavoriteFlash(false), 400);
+    return () => clearTimeout(timer);
+  }, [favorite]);
+
+  return (
+    <Marker
+      coordinate={{ latitude: cafe.latitude, longitude: cafe.longitude }}
+      tracksViewChanges={(photoUrl ? !photoLoaded : false) || favoriteFlash}
+      onPress={onPress}
+    >
+      <View style={photoUrl ? styles.pinWithPhoto : styles.pin}>
+        {photoUrl ? (
+          <Image
+            source={{ uri: photoUrl }}
+            style={styles.pinPhoto}
+            onLoadEnd={() => setPhotoLoaded(true)}
+          />
+        ) : (
+          <Ionicons name="cafe" size={16} color={colors.paper} />
+        )}
+        {favorite && (
+          <View style={styles.pinFavoriteBadge}>
+            <Ionicons name="heart" size={9} color={colors.paper} />
+          </View>
+        )}
+      </View>
+    </Marker>
+  );
+}
+
 export default function MapScreen() {
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
+  const { isFavorite } = useFavorites();
   const [selectedCafe, setSelectedCafe] = useState<Cafe | null>(null);
   const { cafes: initialCafes, region: initialRegion, loading, error } = useNearbyCafes();
 
   const [cafes, setCafes] = useState<Cafe[]>([]);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const searchCenterRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const searchRadiusRef = useRef<number>(1500);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!loading) {
       setCafes(initialCafes);
+      setActiveTag(null);
       searchCenterRef.current = { latitude: initialRegion.latitude, longitude: initialRegion.longitude };
+      searchRadiusRef.current = regionToRadiusMeters(initialRegion);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
+
+  const availableTags = useMemo(() => {
+    const set = new Set<string>();
+    cafes.forEach((cafe) => cafe.tags.forEach((tag) => set.add(tag)));
+    return Array.from(set);
+  }, [cafes]);
+
+  const visibleCafes = useMemo(
+    () => (activeTag ? cafes.filter((cafe) => cafe.tags.includes(activeTag)) : cafes),
+    [cafes, activeTag]
+  );
 
   useEffect(() => {
     return () => {
@@ -50,13 +123,15 @@ export default function MapScreen() {
     };
   }, []);
 
-  const searchArea = async (center: { latitude: number; longitude: number }) => {
+  const searchArea = async (center: { latitude: number; longitude: number }, radiusMeters: number) => {
     setSearching(true);
     setSearchError(null);
     try {
-      const results = await fetchNearbyCafes(center.latitude, center.longitude);
+      const results = await fetchNearbyCafes(center.latitude, center.longitude, radiusMeters);
       setCafes(results);
+      setActiveTag(null);
       searchCenterRef.current = center;
+      searchRadiusRef.current = radiusMeters;
     } catch (err) {
       setSearchError(err instanceof Error ? err.message : 'Impossible de charger les cafés');
     } finally {
@@ -66,12 +141,18 @@ export default function MapScreen() {
 
   const handleRegionChangeComplete = (nextRegion: MapRegion) => {
     const center = { latitude: nextRegion.latitude, longitude: nextRegion.longitude };
+    const radius = regionToRadiusMeters(nextRegion);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       const current = searchCenterRef.current;
-      if (!current || distanceMeters(current, center) > SEARCH_HERE_THRESHOLD_METERS) {
-        searchArea(center);
+      const currentRadius = searchRadiusRef.current;
+      const movedFar = !current || distanceMeters(current, center) > SEARCH_HERE_THRESHOLD_METERS;
+      // Redéclenche aussi la recherche si le niveau de zoom a beaucoup changé
+      // (dézoomer sur place ne bouge pas le centre mais doit élargir le rayon).
+      const zoomChanged = radius / currentRadius > 1.4 || radius / currentRadius < 0.6;
+      if (movedFar || zoomChanged) {
+        searchArea(center, radius);
       }
     }, SEARCH_DEBOUNCE_MS);
   };
@@ -88,6 +169,16 @@ export default function MapScreen() {
       longitudeDelta: 0.02,
     });
   };
+
+  const selectedDistanceLabel =
+    selectedCafe && searchCenterRef.current
+      ? formatDistance(
+          distanceMeters(searchCenterRef.current, {
+            latitude: selectedCafe.latitude,
+            longitude: selectedCafe.longitude,
+          })
+        )
+      : null;
 
   return (
     <View style={styles.container}>
@@ -107,19 +198,16 @@ export default function MapScreen() {
           showsUserLocation
           showsMyLocationButton={false}
         >
-          {cafes.map((cafe) => (
-            <Marker
+          {visibleCafes.map((cafe) => (
+            <CafeMarker
               key={cafe.id}
-              coordinate={{ latitude: cafe.latitude, longitude: cafe.longitude }}
+              cafe={cafe}
+              favorite={isFavorite(cafe.id)}
               onPress={(e) => {
                 e.stopPropagation();
                 setSelectedCafe(cafe);
               }}
-            >
-              <View style={styles.pin}>
-                <Ionicons name="cafe" size={16} color={colors.paper} />
-              </View>
-            </Marker>
+            />
           ))}
         </MapView>
       )}
@@ -140,6 +228,32 @@ export default function MapScreen() {
           </Pressable>
         </View>
 
+        {availableTags.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+          >
+            <Pressable
+              style={[styles.chip, shadow.card, !activeTag && styles.chipActive]}
+              onPress={() => setActiveTag(null)}
+            >
+              <Text style={[styles.chipText, !activeTag && styles.chipTextActive]}>Tous</Text>
+            </Pressable>
+            {availableTags.map((tag) => (
+              <Pressable
+                key={tag}
+                style={[styles.chip, shadow.card, activeTag === tag && styles.chipActive]}
+                onPress={() => setActiveTag(activeTag === tag ? null : tag)}
+              >
+                <Text style={[styles.chipText, activeTag === tag && styles.chipTextActive]}>
+                  {tag}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+
         {searching && (
           <View style={[styles.searchingPill, shadow.card]}>
             <ActivityIndicator size="small" color={colors.paper} />
@@ -151,14 +265,20 @@ export default function MapScreen() {
       {selectedCafe && (
         <SafeAreaView style={styles.bottomOverlay} pointerEvents="box-none">
           <Pressable style={[styles.previewCard, shadow.card]} onPress={() => setSelectedCafe(null)}>
-            <View style={styles.previewIcon}>
-              <Ionicons name="cafe" size={22} color={colors.paper} />
-            </View>
+            {selectedCafe.photoUrls[0] ? (
+              <Image source={{ uri: selectedCafe.photoUrls[0] }} style={styles.previewIcon} />
+            ) : (
+              <View style={[styles.previewIcon, styles.previewIconFallback]}>
+                <Ionicons name="cafe" size={22} color={colors.paper} />
+              </View>
+            )}
             <View style={{ flex: 1 }}>
-              <Text style={styles.previewName}>{selectedCafe.name}</Text>
-              <Text style={styles.previewAddress} numberOfLines={1}>
-                {selectedCafe.address}
+              <Text style={styles.previewName} numberOfLines={1}>
+                {selectedCafe.name}
               </Text>
+              {selectedDistanceLabel && (
+                <Text style={styles.previewDistance}>{selectedDistanceLabel}</Text>
+              )}
             </View>
             {selectedCafe.rating > 0 && (
               <View style={styles.ratingPill}>
@@ -166,6 +286,8 @@ export default function MapScreen() {
                 <Text style={styles.ratingText}>{selectedCafe.rating.toFixed(1)}</Text>
               </View>
             )}
+
+            <FavoriteButton cafe={selectedCafe} />
 
             <Pressable style={styles.directionsButton} onPress={() => openDirections(selectedCafe)}>
               <Ionicons name="navigate" size={18} color={colors.paper} />
@@ -287,6 +409,54 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.paper,
   },
+  pinWithPhoto: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.pill,
+    backgroundColor: colors.creamDark,
+    borderWidth: 2,
+    borderColor: colors.paper,
+  },
+  pinPhoto: {
+    width: '100%',
+    height: '100%',
+    borderRadius: radius.pill,
+  },
+  pinFavoriteBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 16,
+    height: 16,
+    borderRadius: radius.pill,
+    backgroundColor: colors.terracotta,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.paper,
+  },
+  chipRow: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  chip: {
+    backgroundColor: colors.paper,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+  },
+  chipActive: {
+    backgroundColor: colors.espresso,
+  },
+  chipText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    color: colors.espresso,
+  },
+  chipTextActive: {
+    color: colors.paper,
+  },
   bottomOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -301,12 +471,15 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     padding: spacing.md,
     borderRadius: radius.lg,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   previewIcon: {
     width: 44,
     height: 44,
     borderRadius: radius.md,
+    backgroundColor: colors.creamDark,
+  },
+  previewIconFallback: {
     backgroundColor: colors.espresso,
     alignItems: 'center',
     justifyContent: 'center',
@@ -316,10 +489,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.ink,
   },
-  previewAddress: {
-    fontFamily: fonts.body,
+  previewDistance: {
+    fontFamily: fonts.bodyMedium,
     fontSize: 12,
-    color: colors.inkSoft,
+    color: colors.terracotta,
     marginTop: 2,
   },
   ratingPill: {

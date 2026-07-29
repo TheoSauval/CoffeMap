@@ -1,25 +1,28 @@
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, fonts, radius, spacing } from '@/constants/theme';
-import { Logo } from '@/components/ui/Logo';
 import { CafeCard } from '@/components/ui/CafeCard';
-import { useFavorites } from '@/lib/favorites';
+import { useVisited } from '@/lib/visited';
 
-export default function FavoritesScreen() {
-  const { favorites, loading } = useFavorites();
+export default function VisitedScreen() {
+  const router = useRouter();
+  const { visited, loading } = useVisited();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <FlatList
-        data={favorites}
+        data={visited}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Logo size="sm" />
-            <Text style={styles.title}>Favoris</Text>
+            <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={8}>
+              <Ionicons name="chevron-back" size={22} color={colors.espresso} />
+            </Pressable>
+            <Text style={styles.title}>Mes cafés visités</Text>
           </View>
         }
         ListEmptyComponent={
@@ -30,11 +33,11 @@ export default function FavoritesScreen() {
           ) : (
             <View style={styles.emptyState}>
               <View style={styles.emptyIcon}>
-                <Ionicons name="heart-outline" size={32} color={colors.espresso} />
+                <Ionicons name="checkmark-done-outline" size={32} color={colors.espresso} />
               </View>
-              <Text style={styles.emptyTitle}>Aucun favori pour l'instant</Text>
+              <Text style={styles.emptyTitle}>Aucun café visité pour l'instant</Text>
               <Text style={styles.emptyText}>
-                Enregistre tes cafés préférés depuis la carte ou l'onglet Découvrir pour les retrouver ici.
+                Marque un café comme visité depuis sa fiche pour tenir ton carnet de bord ici.
               </Text>
             </View>
           )
@@ -55,13 +58,23 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     marginBottom: spacing.lg,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    backgroundColor: colors.paper,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontFamily: fonts.display,
-    fontSize: 32,
+    fontSize: 28,
     color: colors.ink,
-    marginTop: spacing.md,
   },
   emptyState: {
     flex: 1,

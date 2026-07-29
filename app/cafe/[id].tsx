@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   Pressable,
 } from 'react-native';
@@ -14,13 +15,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, fonts, radius, shadow, spacing } from '@/constants/theme';
+import { FavoriteButton } from '@/components/ui/FavoriteButton';
 import { fetchPlaceDetails } from '@/lib/places';
 import { openDirections } from '@/lib/directions';
+import { useVisited } from '@/lib/visited';
 import type { CafeDetails } from '@/types/cafeDetails';
 
 export default function CafeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const { isVisited, toggleVisited } = useVisited();
 
   const [cafe, setCafe] = useState<CafeDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,11 +66,11 @@ export default function CafeDetailScreen() {
           {cafe.photoUrls.length > 0 ? (
             <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
               {cafe.photoUrls.map((url) => (
-                <Image key={url} source={{ uri: url }} style={styles.heroPhoto} />
+                <Image key={url} source={{ uri: url }} style={[styles.heroPhoto, { width }]} />
               ))}
             </ScrollView>
           ) : (
-            <View style={[styles.heroPhoto, styles.heroPlaceholder]}>
+            <View style={[styles.heroPhoto, styles.heroPlaceholder, { width }]}>
               <Ionicons name="cafe" size={48} color={colors.paper} />
             </View>
           )}
@@ -117,6 +122,22 @@ export default function CafeDetailScreen() {
                   <Text style={styles.secondaryActionText}>Site</Text>
                 </Pressable>
               )}
+
+              <Pressable
+                style={isVisited(cafe.id) ? styles.visitedAction : styles.secondaryAction}
+                onPress={() => toggleVisited(cafe)}
+              >
+                <Ionicons
+                  name={isVisited(cafe.id) ? 'checkmark-circle' : 'checkmark-circle-outline'}
+                  size={18}
+                  color={isVisited(cafe.id) ? colors.paper : colors.espresso}
+                />
+                <Text
+                  style={isVisited(cafe.id) ? styles.visitedActionText : styles.secondaryActionText}
+                >
+                  Visité
+                </Text>
+              </Pressable>
             </View>
 
             {cafe.openingHours && cafe.openingHours.length > 0 && (
@@ -137,6 +158,7 @@ export default function CafeDetailScreen() {
         <Pressable style={[styles.backButton, shadow.card]} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={22} color={colors.espresso} />
         </Pressable>
+        {cafe && <FavoriteButton cafe={cafe} style={[styles.backButton, shadow.card]} />}
       </SafeAreaView>
     </View>
   );
@@ -165,7 +187,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   heroPhoto: {
-    width: 393,
     height: HERO_HEIGHT,
     backgroundColor: colors.creamDark,
   },
@@ -223,6 +244,7 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     marginTop: spacing.lg,
   },
@@ -254,6 +276,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.espresso,
   },
+  visitedAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.terracotta,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+  },
+  visitedActionText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 13,
+    color: colors.paper,
+  },
   section: {
     marginTop: spacing.xl,
   },
@@ -274,6 +310,8 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
   },

@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { colors, fonts, radius, shadow, spacing } from '@/constants/theme';
+import { FavoriteButton } from '@/components/ui/FavoriteButton';
 import type { Cafe } from '@/types/cafe';
 
 export function CafeCard({ cafe, distanceLabel }: { cafe: Cafe; distanceLabel?: string }) {
@@ -10,9 +11,13 @@ export function CafeCard({ cafe, distanceLabel }: { cafe: Cafe; distanceLabel?: 
 
   return (
     <Pressable style={[styles.card, shadow.card]} onPress={() => router.push(`/cafe/${cafe.id}`)}>
-      <View style={styles.thumb}>
-        <Ionicons name="cafe" size={28} color={colors.paper} />
-      </View>
+      {cafe.photoUrls[0] ? (
+        <Image source={{ uri: cafe.photoUrls[0] }} style={styles.thumb} />
+      ) : (
+        <View style={[styles.thumb, styles.thumbFallback]}>
+          <Ionicons name="cafe" size={28} color={colors.paper} />
+        </View>
+      )}
 
       <View style={styles.content}>
         <View style={styles.headerRow}>
@@ -25,6 +30,7 @@ export function CafeCard({ cafe, distanceLabel }: { cafe: Cafe; distanceLabel?: 
               <Text style={styles.ratingText}>{cafe.rating.toFixed(1)}</Text>
             </View>
           )}
+          <FavoriteButton cafe={cafe} size={15} style={styles.favoriteButton} />
         </View>
 
         <Text style={styles.tagline} numberOfLines={1}>
@@ -68,10 +74,13 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: radius.md,
+    backgroundColor: colors.creamDark,
+    marginRight: spacing.md,
+  },
+  thumbFallback: {
     backgroundColor: colors.espresso,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
   },
   content: {
     flex: 1,
@@ -79,13 +88,12 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
   name: {
+    flex: 1,
     fontFamily: fonts.bodySemiBold,
     fontSize: 16,
     color: colors.ink,
-    flexShrink: 1,
     marginRight: spacing.sm,
   },
   ratingPill: {
@@ -101,6 +109,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
     fontSize: 12,
     color: colors.espresso,
+  },
+  favoriteButton: {
+    width: 28,
+    height: 28,
+    marginLeft: spacing.sm,
   },
   tagline: {
     fontFamily: fonts.body,
