@@ -20,6 +20,25 @@ export function formatDistance(meters: number): string {
   return `${(meters / 1000).toFixed(1)} km`;
 }
 
+const METERS_PER_LAT_DEGREE = 111320;
+const MIN_SEARCH_RADIUS_METERS = 500;
+const MAX_SEARCH_RADIUS_METERS = 50000; // limite de l'API Google Places Nearby Search
+
+// Rayon (en mètres) couvrant la zone actuellement visible à l'écran, pour que
+// dézoomer élargisse réellement la recherche au lieu de rester bloqué sur le
+// petit rayon de la toute première recherche.
+export function regionToRadiusMeters(region: {
+  latitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+}): number {
+  const latMeters = region.latitudeDelta * METERS_PER_LAT_DEGREE;
+  const lngMeters =
+    region.longitudeDelta * METERS_PER_LAT_DEGREE * Math.cos((region.latitude * Math.PI) / 180);
+  const radius = Math.max(latMeters, lngMeters) / 2;
+  return Math.min(MAX_SEARCH_RADIUS_METERS, Math.max(MIN_SEARCH_RADIUS_METERS, radius));
+}
+
 export function destinationPoint(origin: LatLng, bearingDeg: number, distance: number): LatLng {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const toDeg = (rad: number) => (rad * 180) / Math.PI;

@@ -10,10 +10,10 @@
     "backgroundColor": "#F2E6D3",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.coffeemap.app"
+      "bundleIdentifier": "com.theosauval.coffeemap"
     },
     "android": {
-      "package": "com.coffeemap.app",
+      "package": "com.theosauval.coffeemap",
       "adaptiveIcon": {
         "backgroundColor": "#F2E6D3",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -41,7 +41,8 @@
         {
           "locationWhenInUsePermission": "CoffeeMap utilise ta position pour te montrer les cafés autour de toi."
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }

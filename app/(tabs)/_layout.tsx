@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, fonts } from '@/constants/theme';
+import { blue, tabBarStyle as myCafeTabBarStyle } from './my-cafe';
 
 export default function TabsLayout() {
   return (
@@ -34,6 +35,16 @@ export default function TabsLayout() {
         options={{
           title: 'Découvrir',
           tabBarIcon: ({ color, size }) => <Ionicons name="search" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="my-cafe"
+        options={{
+          title: 'Mon café',
+          tabBarActiveTintColor: blue.white,
+          tabBarInactiveTintColor: blue.whiteSoft,
+          tabBarStyle: myCafeTabBarStyle,
+          tabBarIcon: ({ color, size }) => <Ionicons name="cafe-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
