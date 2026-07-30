@@ -3,6 +3,7 @@ import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,10 +29,20 @@ import type { Cafe } from '@/types/cafe';
 const SEARCH_HERE_THRESHOLD_METERS = 800;
 const SEARCH_DEBOUNCE_MS = 600;
 
-// Sur iOS, un Marker avec tracksViewChanges actif re-capture son rendu en
-// continu (coûteux avec 20 pins). On ne le laisse actif que le temps que la
-// photo arrive, puis on fige — et on le réactive brièvement quand le badge
-// favori change, sinon le pin figé ne refléterait pas le toggle.
+// Un Marker avec tracksViewChanges actif re-capture son rendu en continu
+// (coûteux avec 20 pins) : on ne le laisse actif que le temps d'afficher la
+// photo, puis on fige. Le délai après chargement est nécessaire sur Android,
+// où la capture du marqueur en bitmap est asynchrone — couper le suivi dès
+// `onLoadEnd` fige une vignette encore vide. On réactive aussi brièvement le
+// suivi au changement de favori, sinon le pin figé ignorerait le badge.
+const MARKER_SETTLE_MS = 300;
+
+// Android rend le marqueur sous forme de bitmap, et une image distante n'y est
+// jamais peinte : la vignette ressort vide. Testé sans succès avec un délai
+// allongé, des dimensions fixes, un suivi permanent et un préchargement de
+// l'image. On s'en tient donc à l'icône sur Android — les photos restent
+// visibles sur la fiche du café et dans les listes.
+const SHOWS_PHOTO_PIN = Platform.OS === 'ios';
 function CafeMarker({
   cafe,
   favorite,
@@ -41,10 +52,17 @@ function CafeMarker({
   favorite: boolean;
   onPress: NonNullable<ComponentProps<typeof Marker>['onPress']>;
 }) {
-  const photoUrl = cafe.photoUrls[0];
-  const [photoLoaded, setPhotoLoaded] = useState(false);
+  const photoUrl = SHOWS_PHOTO_PIN ? cafe.photoUrls[0] : undefined;
+  const [photoLoaded, setPhotoLoaded] = useState(!photoUrl);
+  const [settled, setSettled] = useState(false);
   const [favoriteFlash, setFavoriteFlash] = useState(false);
   const firstRender = useRef(true);
+
+  useEffect(() => {
+    if (!photoLoaded) return;
+    const timer = setTimeout(() => setSettled(true), MARKER_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [photoLoaded]);
 
   useEffect(() => {
     if (firstRender.current) {
@@ -59,7 +77,7 @@ function CafeMarker({
   return (
     <Marker
       coordinate={{ latitude: cafe.latitude, longitude: cafe.longitude }}
-      tracksViewChanges={(photoUrl ? !photoLoaded : false) || favoriteFlash}
+      tracksViewChanges={!settled || favoriteFlash}
       onPress={onPress}
     >
       <View style={photoUrl ? styles.pinWithPhoto : styles.pin}>
