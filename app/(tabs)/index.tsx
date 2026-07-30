@@ -162,13 +162,17 @@ export default function MapScreen() {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return;
 
-    const position = await Location.getCurrentPositionAsync({});
-    mapRef.current?.animateToRegion({
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-      latitudeDelta: 0.02,
-      longitudeDelta: 0.02,
-    });
+    try {
+      const position = await Location.getCurrentPositionAsync({});
+      mapRef.current?.animateToRegion({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      });
+    } catch (err) {
+      setSearchError(toUserMessage(err, 'Position indisponible pour le moment.'));
+    }
   };
 
   const selectedDistanceLabel =
@@ -213,12 +217,6 @@ export default function MapScreen() {
         </MapView>
       )}
 
-      {(error || searchError) && !loading && (
-        <SafeAreaView style={styles.errorBanner} pointerEvents="none">
-          <Text style={styles.errorText}>{error ?? searchError}</Text>
-        </SafeAreaView>
-      )}
-
       <SafeAreaView style={styles.topOverlay} pointerEvents="box-none">
         <View style={styles.header}>
           <Text style={styles.headerTitle}>
@@ -259,6 +257,14 @@ export default function MapScreen() {
           <View style={[styles.searchingPill, shadow.card]}>
             <ActivityIndicator size="small" color={colors.paper} />
             <Text style={styles.searchHereText}>Mise à jour des cafés…</Text>
+          </View>
+        )}
+
+        {/* Sous les filtres plutôt qu'en position absolue : superposé au
+            header, le bandeau recouvrait le logo. */}
+        {(error || searchError) && !loading && (
+          <View style={styles.errorBanner} pointerEvents="none">
+            <Text style={styles.errorText}>{error ?? searchError}</Text>
           </View>
         )}
       </SafeAreaView>
@@ -336,16 +342,14 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
   },
   errorBanner: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
     alignItems: 'center',
-    paddingTop: spacing.sm,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   errorText: {
     fontFamily: fonts.bodyMedium,
     fontSize: 12,
+    textAlign: 'center',
     color: colors.paper,
     backgroundColor: colors.danger,
     paddingHorizontal: spacing.md,

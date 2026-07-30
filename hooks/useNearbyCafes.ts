@@ -36,9 +36,16 @@ export function useNearbyCafes(radiusMeters = 1500) {
         let longitude = PARIS_REGION.longitude;
 
         if (status === 'granted') {
-          const position = await Location.getCurrentPositionAsync({});
-          latitude = position.coords.latitude;
-          longitude = position.coords.longitude;
+          try {
+            const position = await Location.getCurrentPositionAsync({});
+            latitude = position.coords.latitude;
+            longitude = position.coords.longitude;
+          } catch (err) {
+            // Autorisation accordée mais position indisponible (GPS coupé,
+            // émulateur sans coordonnées) : on garde la zone par défaut plutôt
+            // que de bloquer l'écran sur une erreur.
+            console.warn('Position indisponible, repli sur la zone par défaut', err);
+          }
         }
 
         const nearby = await fetchNearbyCafes(latitude, longitude, radiusMeters);
