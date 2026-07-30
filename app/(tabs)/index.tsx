@@ -21,6 +21,7 @@ import { useFavorites } from '@/lib/favorites';
 import { useNearbyCafes } from '@/hooks/useNearbyCafes';
 import { fetchNearbyCafes } from '@/lib/places';
 import { distanceMeters, formatDistance, regionToRadiusMeters } from '@/lib/geo';
+import { toUserMessage } from '@/lib/errors';
 import { openDirections } from '@/lib/directions';
 import type { Cafe } from '@/types/cafe';
 
@@ -133,7 +134,7 @@ export default function MapScreen() {
       searchCenterRef.current = center;
       searchRadiusRef.current = radiusMeters;
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : 'Impossible de charger les cafés');
+      setSearchError(toUserMessage(err, 'Impossible de mettre à jour les cafés de cette zone.'));
     } finally {
       setSearching(false);
     }

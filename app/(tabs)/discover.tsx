@@ -17,6 +17,7 @@ import { colors, fonts, radius, spacing } from '@/constants/theme';
 import { useNearbyCafes } from '@/hooks/useNearbyCafes';
 import { fetchNearbyCafes } from '@/lib/places';
 import { destinationPoint, distanceMeters, formatDistance } from '@/lib/geo';
+import { toUserMessage } from '@/lib/errors';
 import { CafeCard } from '@/components/ui/CafeCard';
 import { Logo } from '@/components/ui/Logo';
 import type { Cafe } from '@/types/cafe';
@@ -52,6 +53,7 @@ export default function DiscoverScreen() {
   const [query, setQuery] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>('rating');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading) {
@@ -63,12 +65,13 @@ export default function DiscoverScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    setActionError(null);
     try {
       const results = await fetchNearbyCafes(region.latitude, region.longitude, DISCOVER_RADIUS_METERS);
       setBatches([results]);
       setLoadMoreStep(0);
-    } catch {
-      // le prochain onglet Carte remontera l'erreur si la clé/API est en cause
+    } catch (err) {
+      setActionError(toUserMessage(err, 'Impossible de rafraîchir la liste.'));
     } finally {
       setRefreshing(false);
     }
@@ -79,6 +82,7 @@ export default function DiscoverScreen() {
     if (!offset) return;
 
     setLoadingMore(true);
+    setActionError(null);
     try {
       const center = destinationPoint(region, offset.bearing, offset.distance);
       const results = await fetchNearbyCafes(
@@ -92,8 +96,9 @@ export default function DiscoverScreen() {
         return newOnes.length > 0 ? [...current, newOnes] : current;
       });
       setLoadMoreStep((step) => step + 1);
-    } catch {
-      // on garde la liste actuelle si l'élargissement échoue
+    } catch (err) {
+      // La liste déjà affichée est conservée : on signale juste l'échec.
+      setActionError(toUserMessage(err, "Impossible de charger plus de cafés."));
     } finally {
       setLoadingMore(false);
     }
@@ -217,6 +222,13 @@ export default function DiscoverScreen() {
                 </Text>
               </Pressable>
             </View>
+
+            {actionError && (
+              <View style={styles.errorBanner}>
+                <Ionicons name="cloud-offline-outline" size={15} color={colors.danger} />
+                <Text style={styles.errorBannerText}>{actionError}</Text>
+              </View>
+            )}
           </View>
         }
         ListEmptyComponent={
@@ -353,6 +365,23 @@ const styles = StyleSheet.create({
   },
   sortTextActive: {
     color: colors.paper,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: '#F5DCD8',
+    borderRadius: radius.md,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.danger,
   },
   footer: {
     alignItems: 'center',

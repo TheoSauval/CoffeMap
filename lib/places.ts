@@ -1,3 +1,4 @@
+import { configError, httpError, offlineError } from './errors';
 import type { Cafe } from '@/types/cafe';
 import type { CafeDetails } from '@/types/cafeDetails';
 
@@ -80,9 +81,7 @@ export type CafeSnapshot = Omit<Cafe, 'photoUrls'> & { photoRefs: string[] };
 
 function apiKeyOrThrow(): string {
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
-  if (!apiKey) {
-    throw new Error('EXPO_PUBLIC_GOOGLE_PLACES_API_KEY manquante — vérifie ton fichier .env');
-  }
+  if (!apiKey) throw configError();
   return apiKey;
 }
 
@@ -118,19 +117,26 @@ export function materializeCafe(snapshot: CafeSnapshot): Cafe {
 
 async function requestPlaces<T>(url: string, fieldMask: string, body?: unknown): Promise<T> {
   const apiKey = apiKeyOrThrow();
-  const response = await fetch(url, {
-    method: body ? 'POST' : 'GET',
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': fieldMask,
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: body ? 'POST' : 'GET',
+      headers: {
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': fieldMask,
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch (err) {
+    // `fetch` ne rejette que faute de réseau : pas de réponse HTTP à lire.
+    throw offlineError(err);
+  }
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    throw new Error(`Places API a répondu ${response.status}: ${text}`);
+    throw httpError(response.status, text);
   }
 
   return response.json();

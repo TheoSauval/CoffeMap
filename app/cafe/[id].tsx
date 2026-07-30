@@ -19,6 +19,7 @@ import { FavoriteButton } from '@/components/ui/FavoriteButton';
 import { fetchPlaceDetails } from '@/lib/places';
 import { openDirections } from '@/lib/directions';
 import { useVisited } from '@/lib/visited';
+import { toUserMessage } from '@/lib/errors';
 import type { CafeDetails } from '@/types/cafeDetails';
 
 export default function CafeDetailScreen() {
@@ -40,7 +41,7 @@ export default function CafeDetailScreen() {
         const details = await fetchPlaceDetails(id);
         if (!cancelled) setCafe(details);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Impossible de charger ce café');
+        if (!cancelled) setError(toUserMessage(err, 'Impossible de charger cette fiche.'));
       } finally {
         if (!cancelled) setLoading(false);
       }

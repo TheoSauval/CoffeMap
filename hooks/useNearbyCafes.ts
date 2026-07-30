@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import * as Location from 'expo-location';
 
 import { fetchNearbyCafes } from '@/lib/places';
+import { toUserMessage } from '@/lib/errors';
 import type { Cafe } from '@/types/cafe';
 
 export type Region = {
@@ -47,7 +48,7 @@ export function useNearbyCafes(radiusMeters = 1500) {
         setRegion({ latitude, longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 });
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Impossible de charger les cafés');
+          setError(toUserMessage(err, 'Impossible de charger les cafés autour de toi.'));
         }
       } finally {
         if (!cancelled) setLoading(false);

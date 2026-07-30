@@ -5,6 +5,7 @@ import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import type { Session, User } from '@supabase/supabase-js';
 
 import { isSupabaseConfigured, supabase } from './supabase';
+import { describeAuthError } from './errors';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -21,13 +22,16 @@ async function trySetSessionFromUrl(
   url: string
 ): Promise<(AuthResult & { recovery: boolean }) | null> {
   const { params, errorCode } = QueryParams.getQueryParams(url);
-  if (errorCode) return { error: errorCode, recovery: false };
+  if (errorCode) return { error: describeAuthError(errorCode), recovery: false };
 
   const { access_token, refresh_token, type } = params;
   if (!access_token || !refresh_token) return null;
 
   const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-  return { error: error?.message ?? null, recovery: type === 'recovery' };
+  return {
+    error: error ? describeAuthError(error.message) : null,
+    recovery: type === 'recovery',
+  };
 }
 
 type AuthContextValue = {
@@ -103,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       signInWithPassword: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        return { error: error?.message ?? null };
+        return { error: error ? describeAuthError(error.message) : null };
       },
 
       signUpWithPassword: async (email, password, fullName) => {
@@ -113,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password,
           options: { data: { full_name: fullName }, emailRedirectTo },
         });
-        if (error) return { error: error.message };
+        if (error) return { error: describeAuthError(error.message) };
         // Si la confirmation par email est activée sur le projet Supabase,
         // signUp ne renvoie pas de session tant que le lien n'a pas été cliqué.
         return { error: null, needsConfirmation: !data.session };
@@ -125,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           provider,
           options: { redirectTo, skipBrowserRedirect: true },
         });
-        if (error) return { error: error.message };
+        if (error) return { error: describeAuthError(error.message) };
         if (!data?.url) return { error: 'Lien de connexion introuvable' };
 
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
@@ -145,12 +149,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // autorisée côté Supabase, et `type=recovery` suffit à distinguer.
         const redirectTo = Linking.createURL('auth/callback');
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-        return { error: error?.message ?? null };
+        return { error: error ? describeAuthError(error.message) : null };
       },
 
       updatePassword: async (password) => {
         const { error } = await supabase.auth.updateUser({ password });
-        if (error) return { error: error.message };
+        if (error) return { error: describeAuthError(error.message) };
         setRecovering(false);
         return { error: null };
       },
@@ -162,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       deleteAccount: async () => {
         const { error } = await supabase.rpc('delete_user');
-        if (error) return { error: error.message };
+        if (error) return { error: describeAuthError(error.message) };
         await supabase.auth.signOut();
         return { error: null };
       },
